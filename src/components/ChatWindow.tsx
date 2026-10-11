@@ -6,6 +6,7 @@ export interface ChatMessage {
   seq?: number
   role: Role
   content: string
+  model?: string | null
 }
 
 interface ChatWindowProps {
@@ -89,6 +90,12 @@ export default function ChatWindow({ messages, loading, draft, onDraftChange, on
               className={`chat-message ${m.role}`}
             >
               <Markdown>{m.content}</Markdown>
+
+              {m.role === 'assistant' && m.model && (
+                <div className="message-model">
+                  Modèle : {m.model}
+                </div>
+              )}
             </div>
           )
         })}

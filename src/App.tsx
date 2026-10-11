@@ -11,6 +11,7 @@ import {
 } from './api'
 import ChatWindow, { type ChatMessage } from './components/ChatWindow'
 import Sidebar from './components/Sidebar'
+import { getModels } from './api';
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : 'Une erreur est survenue.'
@@ -23,6 +24,8 @@ export default function App() {
   const [draft, setDraft] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [models, setModels] = useState<string[]>([]);
+  const [selectedModel, setSelectedModel] = useState('');
 
   // On startup, load the history and open the most recent conversation.
   useEffect(() => {
@@ -47,6 +50,17 @@ export default function App() {
       cancelled = true
     }
   }, [activeId])
+
+  useEffect(() => {
+    getModels()
+      .then((data) => {
+        setModels(data.models);
+        setSelectedModel(data.default);
+      })
+      .catch((error) => {
+        console.error('Erreur to load models :', error);
+      });
+  }, []);
 
   function selectConversation(id: number) {
     if (loading || id === activeId) return
@@ -94,7 +108,7 @@ export default function App() {
     ])
 
     try {
-      await sendMessageStream(conversationId, text, {
+      await sendMessageStream(conversationId, text, selectedModel,{
         onToken: (token) => {
           setMessages((list) => {
             const updated = [...list]
@@ -211,14 +225,35 @@ export default function App() {
             </button>
           </div>
         ) : (
-          <ChatWindow
-            messages={messages}
-            loading={loading}
-            draft={draft}
-            onDraftChange={setDraft}
-            onSend={handleSend}
-            onCreateNote={handleCreateNote}
-          />
+          <>
+            <div className="model-selector">
+              <label htmlFor="model-select">
+                Choose model AI:
+              </label>
+
+              <select
+                id="model-select"
+                value={selectedModel}
+                onChange={(event) => setSelectedModel(event.target.value)}
+                disabled={loading}
+              >
+                {models.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <ChatWindow
+              messages={messages}
+              loading={loading}
+              draft={draft}
+              onDraftChange={setDraft}
+              onSend={handleSend}
+              onCreateNote={handleCreateNote}
+            />
+          </>
         )}
       </main>
     </div>

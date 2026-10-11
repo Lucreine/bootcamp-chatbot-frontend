@@ -16,12 +16,18 @@ export interface Message {
   seq: number
   role: Role
   content: string
+  model?: string | null
   created_at: string
 }
 
 export interface StreamCallbacks {
   onToken: (token: string) => void
   onNotification: (content: string) => void
+}
+
+export interface ModelsResponse {
+  models: string[];
+  default: string;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -80,6 +86,7 @@ export function createNote(conversationId: number, content: string): Promise<Mes
 export async function sendMessageStream(
   conversationId: number,
   message: string,
+  model: string,
   callbacks: StreamCallbacks,
 ): Promise<string> {
   let response: Response
@@ -91,6 +98,7 @@ export async function sendMessageStream(
       body: JSON.stringify({
         conversation_id: conversationId,
         message,
+        model,
       }),
     })
   } catch {
@@ -196,4 +204,8 @@ export async function sendMessageStream(
   } finally {
     reader.releaseLock()
   }
+}
+
+export async function getModels(): Promise<ModelsResponse> {
+  return request<ModelsResponse>('/models');
 }
