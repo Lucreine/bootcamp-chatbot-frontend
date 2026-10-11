@@ -5,7 +5,8 @@ import {
   createNote,
   getMessages,
   listConversations,
-  sendMessage,
+  // sendMessage,
+  sendMessageStream,
   type ConversationSummary,
 } from './api'
 import ChatWindow, { type ChatMessage } from './components/ChatWindow'
@@ -73,27 +74,89 @@ export default function App() {
   }
 
   async function handleSend() {
-    if (activeId === null) return
+    if (activeId === null || loading) return
+
+    const conversationId = activeId
     const text = draft.trim()
+
+    if (!text) return
+
     const isFirstMessage = messages.length === 0
+
     setError(null)
     setDraft('')
-    setMessages((list) => [...list, { role: 'user', content: text }])
     setLoading(true)
+
+    setMessages((list) => [
+      ...list,
+      { role: 'user', content: text },
+      { role: 'assistant', content: '' },
+    ])
+
     try {
-      const { reply, notification } = await sendMessage(activeId, text)
-      setMessages((list) => [
-        ...list,
-        { role: 'assistant', content: reply },
-        ...(notification ? [{ role: 'system-notification' as const, content: notification }] : []),
-      ])
+      await sendMessageStream(conversationId, text, {
+        onToken: (token) => {
+          setMessages((list) => {
+            const updated = [...list]
+
+            for (let i = updated.length - 1; i >= 0; i--) {
+              if (updated[i].role === 'assistant') {
+                updated[i] = {
+                  ...updated[i],
+                  content: updated[i].content + token,
+                }
+                break
+              }
+            }
+
+            return updated
+          })
+        },
+
+        onNotification: (content) => {
+          setMessages((list) => [
+            ...list,
+            { role: 'system-notification', content },
+          ])
+        },
+      })
       // The first message becomes the conversation's preview in the sidebar.
       if (isFirstMessage) setConversations(await listConversations())
     } catch (err) {
-      // The backend didn't save the turn: drop the optimistic message and give the text back.
-      setMessages((list) => list.slice(0, -1))
-      setDraft(text)
       setError(errorMessage(err))
+
+      // Reload the current state from the database: the commit may have succeeded just before a network outage.
+      try {
+        const persisted = await getMessages(conversationId)
+
+        setMessages(
+          persisted.map(({ seq, role, content }) => ({
+            seq,
+            role,
+            content,
+          })),
+        )
+
+        let saved = false
+
+        for (let i = persisted.length - 2; i >= 0; i--) {
+          if (
+            persisted[i].role === 'user' &&
+            persisted[i].content === text &&
+            persisted[i + 1].role === 'assistant'
+          ) {
+            saved = true
+            break
+          }
+        }
+
+        // Do not revert the text to a draft if it has been saved.
+        if (!saved) setDraft(text)
+      } catch {
+        // If the reload fails, remove the two provisional bubbles.
+        setMessages((list) => list.slice(0, -2))
+        setDraft(text)
+      }
     } finally {
       setLoading(false)
     }
