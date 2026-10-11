@@ -1,7 +1,11 @@
 // Thin typed wrappers around the FastAPI backend (proxied under /api by Vite).
 
-export type Role = 'user' | 'assistant' | 'system-notification'
-
+export type Role =
+  | 'user'
+  | 'assistant'
+  | 'system-notification'
+  | 'note'
+  
 export interface ConversationSummary {
   id: number
   created_at: string
@@ -58,5 +62,12 @@ export function sendMessage(conversationId: number, message: string): Promise<Ch
   return request('/chat', {
     method: 'POST',
     body: JSON.stringify({ conversation_id: conversationId, message }),
+  })
+}
+
+export function createNote(conversationId: number, content: string): Promise<Message> {
+  return request(`/conversations/${conversationId}/notes`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
   })
 }

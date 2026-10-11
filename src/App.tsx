@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import './App.css'
 import {
   createConversation,
+  createNote,
   getMessages,
   listConversations,
   sendMessage,
@@ -38,7 +39,7 @@ export default function App() {
     let cancelled = false
     getMessages(activeId)
       .then((list) => {
-        if (!cancelled) setMessages(list.map(({ role, content }) => ({ role, content })))
+        if (!cancelled) setMessages(list.map(({ seq, role, content }) => ({ seq, role, content })))
       })
       .catch((err) => !cancelled && setError(errorMessage(err)))
     return () => {
@@ -98,6 +99,30 @@ export default function App() {
     }
   }
 
+  async function handleCreateNote(content: string): Promise<boolean> {
+    if (activeId === null) return false
+
+    setError(null)
+
+    try {
+      const note = await createNote(activeId, content)
+
+      setMessages((list) => [
+        ...list,
+        {
+          seq: note.seq,
+          role: note.role,
+          content: note.content,
+        },
+      ])
+
+      return true
+    } catch (err) {
+      setError(errorMessage(err))
+      return false
+    }
+  }
+
   return (
     <div className="app">
       <Sidebar
@@ -129,6 +154,7 @@ export default function App() {
             draft={draft}
             onDraftChange={setDraft}
             onSend={handleSend}
+            onCreateNote={handleCreateNote}
           />
         )}
       </main>
